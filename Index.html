@@ -1,0 +1,94 @@
+To upload an image to Cloudflare, Here are the general steps to do so:
+
+1. Signup to Cloudflare account
+2. Create a form to upload a file
+3. create a route for the the controller
+4. call the upload function 
+
+
+public function uploadImage($image)
+{
+    $mime = $image->getMimeType();
+    $name = $image->getClientOriginalName();
+    
+    $imagePath =  new \CURLFile($image, $mime , $name);
+    $curl = curl_init();
+    curl_setopt_array($curl, array(
+        CURLOPT_URL => 'https://api.cloudflare.com/client/v4/accounts/'.env('CLOUDFLARE_ACCOUNT_ID').'/images/v1',
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => '',
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 0,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => 'POST',
+        CURLOPT_VERBOSE => true,
+        CURLOPT_POSTFIELDS =>   array('file'=>$imagePath ),
+        CURLOPT_HTTPHEADER => array(
+        'X-Auth-Email:'.env('CLOUDFLARE_EMAIL'),
+        'X-Auth-Key:'.env('CLOUDFLARE_GLOBAL_API_KEY'),
+        'Authorization: Bearer '.env('CLOUDFLARE_API_TOKEN'),
+        'Cookie: __cflb=0H28vgHxwvgAQtjUGU56Rb8iNWZVUvXhaDgup6ES7uF; __cfruid=ca5c3df1b21680a0c9e1a19837be27dfa165816f-1676981339',
+        'Content-Type:  multipart/form-data'
+        ),
+    ));
+    
+    $response = curl_exec($curl);
+    if (!$response) {
+        die('Error: "' . curl_error($curl) . '" - Code: ' . curl_errno($curl));
+    }
+    
+    return $response;
+}
+
+
+public function upload(Request $request)
+{
+    
+    $response = json_decode($this->uploadImage($request->file('image')));
+
+    if($response->success == true)
+    {
+        $image_id = $response->result->id;
+        $image_url = "https://imagedelivery.net/".env('CLOUDFLARE_ACCOUNT_HASH')."/".$image_id."/w=400";
+    }
+
+    echo "<img src='".$image_url."' alt=''>";
+}
+
+
+
+5. To delete image from cloudflare use delete function 
+
+public function deleteImageFromCloud($imageID){
+    $curl = curl_init();
+    curl_setopt_array($curl, array(
+        CURLOPT_URL => 'https://api.cloudflare.com/client/v4/accounts/'.env('CLOUDFLARE_ACCOUNT_ID').'/images/v1/'.$imageID,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => '',
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 0,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => 'DELETE',
+        CURLOPT_HTTPHEADER => array(
+        'Authorization: Bearer '.env('CLOUDFLARE_API_TOKEN'),
+        'Cookie: __cflb=0H28vgHxwvgAQtjUGU56Rb8iNWZVUvXhaDgup6ES7uF; __cfruid=ca5c3df1b21680a0c9e1a19837be27dfa165816f-1676981339'
+        ),
+    ));
+    
+    $response = curl_exec($curl);
+    return $response;
+}
+
+public function delete(Request $request)
+{
+    // $string = "https://imagedelivery.net/<ACCOUNT_HASH>/<IMAGE_ID>/w=400";
+    // $id = explode("/",$string);
+    $imageID = $id[4];
+    $response = json_decode($this->deleteImageFromCloud($imageID));
+    if($response->success == true)
+    {
+        echo "image deleted";
+    }
+}
